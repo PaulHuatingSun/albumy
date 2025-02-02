@@ -44,11 +44,12 @@ Before setting up the system, ensure you have:
    - Copy the **Key** and **Endpoint** from the **Keys and Endpoint** page.
 
 2️⃣ Set the environment variables:  
-    Open a terminal:
+    Open a terminal, and navigate to the blueprints folder:
+
     ```
     **cd albumy*/blueprints**
     ```
-
+    
    - **Mac/Linux:**
      ```bash
      export AZURE_CV_KEY="your-key"
