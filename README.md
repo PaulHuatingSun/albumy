@@ -11,6 +11,15 @@ An open-source **Flask** web application for photo sharing, now enhanced with **
 
 ---
 
+## 🚀 **New Features Added**
+
+🔹 **AI-Powered Image Tagging:** Automatically tags uploaded images using **Azure AI Vision**.  
+🔹 **AI-Generated Alternative Text (Alt Text):** Improves accessibility by generating descriptions for images.  
+🔹 **Intelligent Image Search:** Enables searching images based on detected objects, scenes, and AI-generated tags.  
+🔹 **Secure API Key Handling:** Uses environment variables to manage sensitive credentials safely.    
+
+---
+
 ## 🚀 **Installation**
 
 ### **1️⃣ Clone the Repository**
@@ -27,7 +36,6 @@ Albumy uses **Azure AI Computer Vision** for **automated image tagging and searc
 ### **2️⃣ Prerequisites**
 Before setting up the system, ensure you have:
 - An **Azure subscription** → *[Create one for free](https://azure.microsoft.com/en-us/free/ai-services/)*
-- **Python 3.x** → *[Download Python](https://www.python.org/)*
 - Installed **pip** → Run `pip --version` to check. If missing, install the latest Python version.
 
 ### **3️⃣ Set Up Azure AI Credentials**
@@ -90,22 +98,6 @@ The app will be available at:
 ## 🔑 **Test Account**
 - **Email:** `admin@helloflask.com`
 - **Password:** `helloflask`
-
----
-
-## 📝 **Committing Code Changes & Managing Credentials**
-### **7️⃣ Commit Code Safely**
-- **DO NOT** commit private credentials (e.g., API keys).
-- Ensure **environment variables** are used for sensitive data.
-
-### **8️⃣ Updating Dependencies**
-If you add new Python libraries:
-```bash
-pip freeze > requirements.txt
-git add requirements.txt
-git commit -m "Updated dependencies"
-git push origin main
-```
 
 ---
 
