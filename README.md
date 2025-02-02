@@ -46,10 +46,9 @@ Before setting up the system, ensure you have:
 2️⃣ Set the environment variables:  
     Open a terminal, and navigate to the blueprints folder:
 
-    ```
-    **cd albumy*/blueprints**
-    ```
-    
+  - **cd albumy*/blueprints**
+
+
    - **Mac/Linux:**
      ```bash
      export AZURE_CV_KEY="your-key"
