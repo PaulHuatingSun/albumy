@@ -19,8 +19,36 @@ from albumy.models import User, Photo, Tag, Follow, Collect, Comment, Notificati
 from albumy.notifications import push_comment_notification, push_collect_notification
 from albumy.utils import rename_image, resize_image, redirect_back, flash_errors
 
+# Import Azure AI for Computer Vision
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
+from msrest.authentication import CognitiveServicesCredentials
+
 main_bp = Blueprint('main', __name__)
 
+# Load API keys from environment variables
+AZURE_CV_KEY = os.getenv("AZURE_CV_KEY")  # Retrieves key from terminal
+AZURE_CV_ENDPOINT = os.getenv("AZURE_CV_ENDPOINT")  # Retrieves endpoint
+
+# Initialize Azure AI Client using environment variables
+cv_client = ComputerVisionClient(
+    AZURE_CV_ENDPOINT,
+    CognitiveServicesCredentials(AZURE_CV_KEY)
+)
+
+def generate_alt_text(image_path):
+    """Use Azure AI to generate alternative text for images."""
+    with open(image_path, "rb") as image:
+        analysis = cv_client.describe_image_in_stream(image, max_descriptions=1)
+        if analysis.captions:
+            return analysis.captions[0].text
+    return "No description available."
+
+def generate_image_tags(image_path):
+    """Use Azure Vision API to extract objects from images."""
+    with open(image_path, "rb") as image:
+        analysis = cv_client.analyze_image_in_stream(image, visual_features=[VisualFeatureTypes.TAGS])
+        return [tag.name for tag in analysis.tags]
 
 @main_bp.route('/')
 def index():
@@ -50,18 +78,24 @@ def explore():
 def search():
     q = request.args.get('q', '').strip()
     if q == '':
-        flash('Enter keyword about photo, user or tag.', 'warning')
+        flash('Enter keyword about photo, user, or tag.', 'warning')
         return redirect_back()
 
     category = request.args.get('category', 'photo')
     page = request.args.get('page', 1, type=int)
     per_page = current_app.config['ALBUMY_SEARCH_RESULT_PER_PAGE']
+
     if category == 'user':
         pagination = User.query.whooshee_search(q).paginate(page, per_page)
     elif category == 'tag':
         pagination = Tag.query.whooshee_search(q).paginate(page, per_page)
     else:
-        pagination = Photo.query.whooshee_search(q).paginate(page, per_page)
+        # Search both descriptions and tags
+        pagination = Photo.query.filter(
+            (Photo.description.ilike(f"%{q}%")) | 
+            (Photo.tags.any(Tag.name.ilike(f"%{q}%")))
+        ).paginate(page, per_page)
+
     results = pagination.items
     return render_template('main/search.html', q=q, results=results, pagination=pagination, category=category)
 
@@ -120,11 +154,18 @@ def get_avatar(filename):
 @permission_required('UPLOAD')
 def upload():
     if request.method == 'POST' and 'file' in request.files:
-        f = request.files.get('file')
-        filename = rename_image(f.filename)
-        f.save(os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename))
+        f = request.files.get('file')  # Get the uploaded file
+        filename = rename_image(f.filename)  # Rename to prevent duplicates
+        file_path = os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename)
+
+        # Save the uploaded image first before any processing
+        f.save(file_path)
+
+        # Generate resized images
         filename_s = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['small'])
         filename_m = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['medium'])
+
+        # Create a new photo entry in the database
         photo = Photo(
             filename=filename,
             filename_s=filename_s,
@@ -133,6 +174,33 @@ def upload():
         )
         db.session.add(photo)
         db.session.commit()
+
+        # Analyze image using Azure AI
+        with open(file_path, "rb") as image_stream:
+            tags = cv_client.tag_image_in_stream(image_stream)  # Object detection
+            image_stream.seek(0)  # Reset file pointer
+            descriptions = cv_client.describe_image_in_stream(image_stream)  # Alt text generation
+
+        # Store detected tags if confidence > 0.9
+        for t in tags.tags:
+            if t.confidence > 0.9:
+                tag = Tag.query.filter_by(name=t.name).first()
+                if tag is None:
+                    tag = Tag(name=t.name)
+                    db.session.add(tag)
+                if tag not in photo.tags:
+                    photo.tags.append(tag)
+
+        # Store the best caption as alt text
+        if len(descriptions.captions) != 0:
+            photo.description = descriptions.captions[0].text
+
+        # Commit changes to the database
+        db.session.commit()
+
+        flash("Image uploaded successfully!", "success")
+        return redirect(url_for("main.index"))
+
     return render_template('main/upload.html')
 
 
